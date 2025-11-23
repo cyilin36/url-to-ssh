@@ -40,7 +40,6 @@ docker run -d \
 在项目根目录下创建 `docker-compose.yml`：
 
 ```yaml
-version: '3'
 services:
   url-to-ssh:
     image: ghcr.io/cyilin36/url-to-ssh:latest
