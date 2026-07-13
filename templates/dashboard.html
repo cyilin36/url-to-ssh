@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}主机 · url-to-ssh{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">HOST DIRECTORY</p>
+    <h1>选择一台主机，发出信号。</h1>
+    <p>SSH 指令和唤醒入口都从这里开始。</p>
+  </div>
+  <button class="button button-primary" type="button" data-open-dialog="host-dialog">添加主机</button>
+</section>
+
+{% if hosts %}
+<section class="host-grid" aria-label="主机列表">
+  {% for host in hosts %}
+  <article class="host-card">
+    <div class="host-card-top">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="mono host-address">{{ host.address }}:{{ host.ssh_port }}</span>
+      <button class="icon-button edit-host" type="button" aria-label="编辑 {{ host.name }}"
+        data-id="{{ host.id }}" data-name="{{ host.name }}" data-address="{{ host.address }}"
+        data-mac="{{ host.mac or '' }}" data-ssh-port="{{ host.ssh_port }}" data-username="{{ host.username }}"
+        data-wol-broadcast="{{ host.wol_broadcast }}" data-wol-port="{{ host.wol_port }}">编辑</button>
+    </div>
+    <a class="host-card-body" href="{{ url_for('host_detail', host_id=host.id) }}">
+      <h2>{{ host.name }}</h2>
+      <dl>
+        <div><dt>SSH</dt><dd class="mono">{{ host.username }}@{{ host.address }}</dd></div>
+        <div><dt>MAC</dt><dd class="mono">{{ host.mac or '尚未设置' }}</dd></div>
+      </dl>
+    </a>
+    <div class="host-card-actions">
+      <a class="button button-quiet" href="{{ url_for('host_detail', host_id=host.id) }}">打开控制台</a>
+      <button class="button button-signal wake-host" type="button" data-id="{{ host.id }}" {% if not host.mac %}disabled title="请先设置 MAC 地址"{% endif %}>唤醒</button>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+  <div class="empty-glyph mono" aria-hidden="true">＿→＿</div>
+  <h2>还没有可连接的主机</h2>
+  <p>先保存 IP、SSH 账号和可选的 MAC 地址。</p>
+  <button class="button button-primary" type="button" data-open-dialog="host-dialog">添加第一台主机</button>
+</section>
+{% endif %}
+
+<dialog id="host-dialog" class="form-dialog">
+  <form id="host-form">
+    <div class="dialog-heading">
+      <div><p class="eyebrow">HOST PROFILE</p><h2 id="host-dialog-title">添加主机</h2></div>
+      <button class="icon-button" type="button" data-close-dialog aria-label="关闭">关闭</button>
+    </div>
+    <input type="hidden" name="id">
+    <div class="form-grid">
+      <label class="span-2">主机名称<input name="name" maxlength="120" required placeholder="例如：客厅 NAS"></label>
+      <label>IP 或主机名<input name="address" maxlength="255" required placeholder="192.168.1.10"></label>
+      <label>MAC 地址（可选）<input class="mono" name="mac" placeholder="AA:BB:CC:DD:EE:FF"></label>
+      <label>SSH 用户名<input name="username" maxlength="255" required placeholder="root"></label>
+      <label>SSH 端口<input name="ssh_port" type="number" min="1" max="65535" value="22" required></label>
+      <label class="span-2">SSH 密码<input name="password" type="password" autocomplete="new-password"><small id="password-hint">新增主机时必填</small></label>
+      <label>WOL 广播地址<input name="wol_broadcast" value="255.255.255.255"></label>
+      <label>WOL UDP 端口<input name="wol_port" type="number" min="1" max="65535" value="9" required></label>
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="dialog-actions">
+      <button id="delete-host" class="button button-danger hidden" type="button">删除主机</button>
+      <span class="action-spacer"></span>
+      <button class="button button-quiet" type="button" data-close-dialog>取消</button>
+      <button class="button button-primary" type="submit">保存主机</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>{% endblock %}

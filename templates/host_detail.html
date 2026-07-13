@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ host.name }} · url-to-ssh{% endblock %}
+{% block content %}
+<section class="host-heading">
+  <div>
+    <a class="back-link" href="{{ url_for('dashboard') }}">← 所有主机</a>
+    <p class="eyebrow">LIVE HOST CONSOLE</p>
+    <h1>{{ host.name }}</h1>
+    <p class="mono">{{ host.username }}@{{ host.address }}:{{ host.ssh_port }}</p>
+  </div>
+  <div class="heading-actions">
+    <button id="wake-button" class="button button-signal" type="button" {% if not host.mac %}disabled title="请先设置 MAC 地址"{% endif %}>发送唤醒包</button>
+    <a class="button button-quiet" href="{{ url_for('dashboard') }}">编辑资料</a>
+  </div>
+</section>
+
+<ol class="signal-rail" aria-label="执行路径">
+  <li class="active"><span>1</span><div><strong>主机</strong><small class="mono">{{ host.address }}</small></div></li>
+  <li><span>2</span><div><strong>SSH</strong><small class="mono">PORT {{ host.ssh_port }}</small></div></li>
+  <li><span>3</span><div><strong>输出</strong><small class="mono">STDOUT / STDERR</small></div></li>
+</ol>
+
+<div class="console-layout" data-host-id="{{ host.id }}">
+  <section class="command-panel panel">
+    <div class="panel-heading"><div><p class="eyebrow">COMMAND</p><h2>发送指令</h2></div><span class="key-hint mono">⌘ ↵</span></div>
+    <form id="execute-form">
+      <label class="sr-only" for="command-input">要执行的 SSH 指令</label>
+      <textarea id="command-input" class="command-input mono" maxlength="4096" rows="6" required placeholder="输入要在 {{ host.name }} 上执行的指令…"></textarea>
+      <div class="command-actions">
+        <span id="command-count" class="mono muted">0 / 4096</span>
+        <button id="execute-button" class="button button-primary" type="submit">发送并生成 URL</button>
+      </div>
+    </form>
+
+    <div id="link-result" class="link-result hidden">
+      <label for="generated-url">永久签名 URL</label>
+      <div class="copy-row"><input id="generated-url" class="mono" readonly><button class="button button-quiet" type="button" data-copy-target="generated-url">复制</button></div>
+      <p>链接固定绑定当前主机和指令，不会暴露 SSH 密码。</p>
+    </div>
+  </section>
+
+  <aside class="preset-panel panel">
+    <div class="panel-heading"><div><p class="eyebrow">SAVED COMMANDS</p><h2>预设指令</h2></div><a href="{{ url_for('command_library') }}">管理</a></div>
+    {% if commands %}
+    <div class="preset-list">
+      {% for item in commands %}
+      <button class="preset-command" type="button" data-command="{{ item.command }}">
+        <span><strong>{{ item.name }}</strong><small>{{ '此主机' if item.host_id else '全局' }}</small></span>
+        <code>{{ item.command }}</code>
+        <i aria-hidden="true">运行 →</i>
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel-empty"><p>还没有可用的预设指令。</p><a href="{{ url_for('command_library') }}">保存第一条指令</a></div>
+    {% endif %}
+  </aside>
+
+  <section class="output-panel panel">
+    <div class="terminal-bar">
+      <div class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+      <span id="output-label" class="mono">等待指令</span>
+      <span id="exit-code" class="terminal-status mono"></span>
+    </div>
+    <pre id="terminal-output" tabindex="0">选择预设指令，或在上方输入一条新指令。</pre>
+  </section>
+
+  <section class="link-tools panel">
+    <div><p class="eyebrow">AUTOMATION LINKS</p><h2>外部调用</h2></div>
+    <label>Wake-on-LAN URL</label>
+    <div class="copy-row"><input id="wake-url" class="mono" value="{{ generated_wake_url }}" readonly><button class="button button-quiet" type="button" data-copy-target="wake-url">复制</button></div>
+    <div class="warning-row"><p>轮换密钥会让这台主机的全部旧链接立即失效。</p><button id="rotate-key" class="button button-danger" type="button">轮换链接密钥</button></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='host.js') }}" defer></script>{% endblock %}

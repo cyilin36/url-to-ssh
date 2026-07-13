@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}指令库 · url-to-ssh{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><p class="eyebrow">COMMAND LIBRARY</p><h1>把常用操作放在手边。</h1><p>全局指令会出现在所有主机上，专属指令只属于一台主机。</p></div>
+  <button class="button button-primary" type="button" data-open-dialog="command-dialog">添加指令</button>
+</section>
+
+{% if commands %}
+<section class="command-table panel">
+  <div class="table-row table-header"><span>名称</span><span>作用范围</span><span>指令</span><span></span></div>
+  {% for item in commands %}
+  <div class="table-row">
+    <strong>{{ item.name }}</strong>
+    <span class="scope-badge {{ 'scope-host' if item.host_id else '' }}">{{ item.host_name or '全部主机' }}</span>
+    <code>{{ item.command }}</code>
+    <button class="icon-button edit-command" type="button" data-id="{{ item.id }}" data-name="{{ item.name }}" data-command="{{ item.command }}" data-host-id="{{ item.host_id or '' }}">编辑</button>
+  </div>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty-state"><div class="empty-glyph mono" aria-hidden="true">$ _</div><h2>指令库还是空的</h2><p>保存一条常用命令，就能在主机页一键运行。</p><button class="button button-primary" type="button" data-open-dialog="command-dialog">添加第一条指令</button></section>
+{% endif %}
+
+<dialog id="command-dialog" class="form-dialog">
+  <form id="command-form">
+    <div class="dialog-heading"><div><p class="eyebrow">SAVED COMMAND</p><h2 id="command-dialog-title">添加指令</h2></div><button class="icon-button" type="button" data-close-dialog>关闭</button></div>
+    <input type="hidden" name="id">
+    <div class="stack-form">
+      <label>指令名称<input name="name" maxlength="120" required placeholder="例如：查看磁盘空间"></label>
+      <label>作用范围<select name="host_id"><option value="">全部主机</option>{% for host in hosts %}<option value="{{ host.id }}">{{ host.name }}</option>{% endfor %}</select></label>
+      <label>指令内容<textarea class="mono" name="command" maxlength="4096" rows="6" required placeholder="df -h"></textarea></label>
+    </div>
+    <p class="form-error" role="alert"></p>
+    <div class="dialog-actions"><button id="delete-command" class="button button-danger hidden" type="button">删除指令</button><span class="action-spacer"></span><button class="button button-quiet" type="button" data-close-dialog>取消</button><button class="button button-primary" type="submit">保存指令</button></div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='commands.js') }}" defer></script>{% endblock %}

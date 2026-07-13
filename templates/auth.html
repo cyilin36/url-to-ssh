@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ '初始化' if mode == 'setup' else '登录' }} · url-to-ssh{% endblock %}
+{% block shell_class %}auth-shell{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <div class="auth-signal" aria-hidden="true">
+    <span>URL</span><i></i><span>SSH</span><i></i><span>HOST</span>
+  </div>
+  <p class="eyebrow">PRIVATE NETWORK CONSOLE</p>
+  <h1>{{ '建立管理员入口' if mode == 'setup' else '回到控制台' }}</h1>
+  <p class="lede">
+    {% if mode == 'setup' %}设置唯一的管理员密码。主机凭据会加密保存在本机数据卷中。{% else %}输入管理员密码以访问主机和指令库。{% endif %}
+  </p>
+  <form method="post" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>管理员密码
+      <input type="password" name="password" minlength="8" required autofocus autocomplete="{{ 'new-password' if mode == 'setup' else 'current-password' }}">
+    </label>
+    {% if mode == 'setup' %}
+    <label>再次输入密码
+      <input type="password" name="confirmation" minlength="8" required autocomplete="new-password">
+    </label>
+    {% endif %}
+    <button class="button button-primary button-wide" type="submit">{{ '创建控制台' if mode == 'setup' else '登录' }}</button>
+  </form>
+  <p class="fine-print">默认面向可信内网。公网使用时请配置 HTTPS 反向代理。</p>
+</section>
+{% endblock %}
