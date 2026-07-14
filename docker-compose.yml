@@ -12,7 +12,4 @@ services:
       # 可选：建议由密码管理器生成并固定，变更后旧数据无法解密
       # - APP_SECRET=replace-with-a-long-random-secret
     volumes:
-      - url-to-ssh-data:/data
-
-volumes:
-  url-to-ssh-data:
+      - ./data:/data
