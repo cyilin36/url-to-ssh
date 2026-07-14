@@ -1,6 +1,6 @@
 services:
   url-to-ssh:
-    image: ghcr.io/cyilin36/url-to-ssh:v1.1-beta1
+    image: ghcr.io/cyilin36/url-to-ssh:v1.1-beta2
     container_name: url-to-ssh
     restart: always
     network_mode: host
