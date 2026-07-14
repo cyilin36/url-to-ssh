@@ -10,7 +10,7 @@ import time
 import uuid
 from functools import wraps
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import paramiko
 from cryptography.fernet import Fernet, InvalidToken
@@ -51,7 +51,6 @@ CREATE TABLE IF NOT EXISTS hosts (
     password_encrypted BLOB NOT NULL,
     wol_broadcast TEXT NOT NULL DEFAULT '255.255.255.255',
     wol_port INTEGER NOT NULL DEFAULT 9 CHECK (wol_port BETWEEN 1 AND 65535),
-    link_secret_encrypted BLOB NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -292,27 +291,16 @@ def public_host(row):
     }
 
 
-def host_link_secret(host):
-    return decrypt_value(host["link_secret_encrypted"]).encode("ascii")
-
-
-def link_signature(host, action, command=""):
-    message = f"{action}\n{host['id']}\n{command}".encode("utf-8")
-    return hmac.new(host_link_secret(host), message, hashlib.sha256).hexdigest()
-
-
-def signature_valid(host, action, command, signature):
-    return bool(signature) and hmac.compare_digest(link_signature(host, action, command), signature)
-
-
 def execution_url(host, command):
-    query = urlencode({"command": command, "sig": link_signature(host, "run", command)})
-    return request.url_root.rstrip("/") + url_for("signed_run", host_id=host["id"]) + "?" + query
-
-
-def wake_url(host):
-    query = urlencode({"sig": link_signature(host, "wake")})
-    return request.url_root.rstrip("/") + url_for("signed_wake", host_id=host["id"]) + "?" + query
+    query = urlencode(
+        {
+            "host": host["address"],
+            "user": host["username"],
+            "pwd": decrypt_value(host["password_encrypted"]),
+            "port": host["ssh_port"],
+        }
+    )
+    return f"{request.url_root.rstrip('/')}/control/{quote(command, safe='')}?{query}"
 
 
 def execute_stored_host(host, command):
@@ -520,9 +508,7 @@ Example: http://{base_url}/control/ls -la?host=192.168.1.100&user=root&pwd=passw
             "ORDER BY host_id IS NOT NULL, name COLLATE NOCASE",
             (host_id,),
         ).fetchall()
-        return render_template(
-            "host_detail.html", host=host, commands=commands, generated_wake_url=wake_url(host)
-        )
+        return render_template("host_detail.html", host=host, commands=commands)
 
     @app.get("/ui/commands")
     @login_required
@@ -541,22 +527,31 @@ Example: http://{base_url}/control/ls -la?host=192.168.1.100&user=root&pwd=passw
         try:
             values = validate_host_payload(request.get_json(silent=True) or {})
             host_id = str(uuid.uuid4())
-            get_db().execute(
-                "INSERT INTO hosts(id, name, address, mac, ssh_port, username, password_encrypted, "
-                "wol_broadcast, wol_port, link_secret_encrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    host_id,
-                    values["name"],
-                    values["address"],
-                    values["mac"],
-                    values["ssh_port"],
-                    values["username"],
-                    encrypt_value(values["password"]),
-                    values["wol_broadcast"],
-                    values["wol_port"],
-                    encrypt_value(secrets.token_urlsafe(32)),
-                ),
+            host_values = (
+                host_id,
+                values["name"],
+                values["address"],
+                values["mac"],
+                values["ssh_port"],
+                values["username"],
+                encrypt_value(values["password"]),
+                values["wol_broadcast"],
+                values["wol_port"],
             )
+            columns = {row["name"] for row in get_db().execute("PRAGMA table_info(hosts)")}
+            if "link_secret_encrypted" in columns:
+                # 兼容已运行过 beta 版本的数据库，该字段不再参与任何功能。
+                get_db().execute(
+                    "INSERT INTO hosts(id, name, address, mac, ssh_port, username, password_encrypted, "
+                    "wol_broadcast, wol_port, link_secret_encrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    host_values + (encrypt_value("unused"),),
+                )
+            else:
+                get_db().execute(
+                    "INSERT INTO hosts(id, name, address, mac, ssh_port, username, password_encrypted, "
+                    "wol_broadcast, wol_port) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    host_values,
+                )
             get_db().commit()
             return jsonify(host=public_host(get_host(host_id))), 201
         except ValueError as exc:
@@ -625,21 +620,9 @@ Example: http://{base_url}/control/ls -la?host=192.168.1.100&user=root&pwd=passw
             return jsonify(error="主机不存在"), 404
         try:
             send_magic_packet(host)
-            return jsonify(message="唤醒数据包已发送", generated_url=wake_url(host))
+            return jsonify(message="唤醒数据包已发送")
         except (ValueError, OSError) as exc:
             return jsonify(error=str(exc)), 400
-
-    @app.post("/api/hosts/<host_id>/rotate-link-key")
-    @api_login_required
-    def rotate_link_key(host_id):
-        if not get_host(host_id):
-            return jsonify(error="主机不存在"), 404
-        get_db().execute(
-            "UPDATE hosts SET link_secret_encrypted=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (encrypt_value(secrets.token_urlsafe(32)), host_id),
-        )
-        get_db().commit()
-        return jsonify(message="链接密钥已轮换，旧链接现已失效", wake_url=wake_url(get_host(host_id)))
 
     @app.post("/api/commands")
     @api_login_required
@@ -680,40 +663,6 @@ Example: http://{base_url}/control/ls -la?host=192.168.1.100&user=root&pwd=passw
         if not cursor.rowcount:
             return jsonify(error="预设指令不存在"), 404
         return jsonify(ok=True)
-
-    @app.get("/run/<host_id>")
-    def signed_run(host_id):
-        host = get_host(host_id)
-        command = request.args.get("command", "")
-        if not host:
-            return Response("[Error] Host not found", status=404, mimetype="text/plain")
-        if not signature_valid(host, "run", command, request.args.get("sig")):
-            return Response("[Error] Invalid signature", status=403, mimetype="text/plain")
-        result = execute_stored_host(host, command)
-        lines = [f"[{host['username']}@{host['address']}] exec: {command}", "=" * 40]
-        if result["stdout"]:
-            lines.append(result["stdout"])
-        if result["stderr"]:
-            lines.extend(["[STDERR]:", result["stderr"]])
-        if result["error"]:
-            lines.append(f"[Connection Failed]: {result['error']}")
-        if result["truncated"]:
-            lines.append("[Output truncated at 1 MiB]")
-        return Response("\n".join(lines), mimetype="text/plain")
-
-    @app.get("/wake/<host_id>")
-    def signed_wake(host_id):
-        host = get_host(host_id)
-        if not host:
-            return Response("[Error] Host not found", status=404, mimetype="text/plain")
-        if not signature_valid(host, "wake", "", request.args.get("sig")):
-            return Response("[Error] Invalid signature", status=403, mimetype="text/plain")
-        try:
-            send_magic_packet(host)
-            return Response("[OK] Wake-on-LAN packet sent", mimetype="text/plain")
-        except (ValueError, OSError) as exc:
-            return Response(f"[Error] {str(exc)}", status=400, mimetype="text/plain")
-
 
 app = create_app()
 

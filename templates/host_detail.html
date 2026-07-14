@@ -33,9 +33,9 @@
     </form>
 
     <div id="link-result" class="link-result hidden">
-      <label for="generated-url">永久签名 URL</label>
+      <label for="generated-url">原接口 URL</label>
       <div class="copy-row"><input id="generated-url" class="mono" readonly><button class="button button-quiet" type="button" data-copy-target="generated-url">复制</button></div>
-      <p>链接固定绑定当前主机和指令，不会暴露 SSH 密码。</p>
+      <p>该链接使用原有 `/control` 接口，包含 SSH 用户名和密码，请仅在可信内网使用。</p>
     </div>
   </section>
 
@@ -65,12 +65,6 @@
     <pre id="terminal-output" tabindex="0">选择预设指令，或在上方输入一条新指令。</pre>
   </section>
 
-  <section class="link-tools panel">
-    <div><p class="eyebrow">AUTOMATION LINKS</p><h2>外部调用</h2></div>
-    <label>Wake-on-LAN URL</label>
-    <div class="copy-row"><input id="wake-url" class="mono" value="{{ generated_wake_url }}" readonly><button class="button button-quiet" type="button" data-copy-target="wake-url">复制</button></div>
-    <div class="warning-row"><p>轮换密钥会让这台主机的全部旧链接立即失效。</p><button id="rotate-key" class="button button-danger" type="button">轮换链接密钥</button></div>
-  </section>
 </div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='host.js') }}" defer></script>{% endblock %}

@@ -1,10 +1,10 @@
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 
 import app as application
 
 
-def test_signed_execution_link_and_rotation(
-    authenticated_client, csrf_headers, stored_host, monkeypatch
+def test_execute_generates_original_control_url(
+    app, authenticated_client, csrf_headers, stored_host, monkeypatch
 ):
     monkeypatch.setattr(
         application,
@@ -24,22 +24,17 @@ def test_signed_execution_link_and_rotation(
     )
     assert response.status_code == 200
     generated_url = response.get_json()["generated_url"]
-    assert "very-secret-password" not in generated_url
     parsed = urlparse(generated_url)
-
-    result = authenticated_client.get(parsed.path + "?" + parsed.query)
-    assert result.status_code == 200
-    assert "Linux lab 6.1" in result.text
-
     query = parse_qs(parsed.query)
-    tampered = urlencode({"command": "reboot", "sig": query["sig"][0]})
-    assert authenticated_client.get(parsed.path + "?" + tampered).status_code == 403
-
-    rotation = authenticated_client.post(
-        f"/api/hosts/{stored_host['id']}/rotate-link-key", headers=csrf_headers, json={}
-    )
-    assert rotation.status_code == 200
-    assert authenticated_client.get(parsed.path + "?" + parsed.query).status_code == 403
+    assert parsed.path == "/control/uname%20-a"
+    assert query == {
+        "host": ["192.168.1.20"],
+        "user": ["root"],
+        "pwd": ["very-secret-password"],
+        "port": ["22"],
+    }
+    rules = {str(rule) for rule in app.url_map.iter_rules()}
+    assert not any(rule.startswith("/run/") or rule.startswith("/wake/") for rule in rules)
 
 
 class FakeChannel:
@@ -126,7 +121,7 @@ class FakeSocket:
         self.sent = (packet, address)
 
 
-def test_wol_packet_and_signed_url(authenticated_client, csrf_headers, stored_host, monkeypatch):
+def test_wol_packet_from_webui(authenticated_client, csrf_headers, stored_host, monkeypatch):
     fake_socket = FakeSocket()
     monkeypatch.setattr(application.socket, "socket", lambda *_args: fake_socket)
     response = authenticated_client.post(
@@ -136,8 +131,4 @@ def test_wol_packet_and_signed_url(authenticated_client, csrf_headers, stored_ho
     packet, destination = fake_socket.sent
     assert destination == ("192.168.1.255", 9)
     assert packet == b"\xff" * 6 + bytes.fromhex("AABBCCDDEEFF") * 16
-
-    parsed = urlparse(response.get_json()["generated_url"])
-    public_response = authenticated_client.get(parsed.path + "?" + parsed.query)
-    assert public_response.status_code == 200
-    assert public_response.text == "[OK] Wake-on-LAN packet sent"
+    assert response.get_json() == {"message": "唤醒数据包已发送"}

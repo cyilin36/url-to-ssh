@@ -62,7 +62,6 @@
     wakeButton.disabled = true;
     try {
       const result = await window.ui.api(`/api/hosts/${hostId}/wake`, { method: 'POST', body: '{}' });
-      document.querySelector('#wake-url').value = result.generated_url;
       window.ui.showToast(result.message);
     } catch (exception) {
       window.ui.showToast(exception.message, true);
@@ -71,15 +70,4 @@
     }
   });
 
-  document.querySelector('#rotate-key')?.addEventListener('click', async () => {
-    if (!window.confirm('轮换后，这台主机之前生成的所有执行和唤醒链接都会失效。继续吗？')) return;
-    try {
-      const result = await window.ui.api(`/api/hosts/${hostId}/rotate-link-key`, { method: 'POST', body: '{}' });
-      document.querySelector('#wake-url').value = result.wake_url;
-      document.querySelector('#link-result').classList.add('hidden');
-      window.ui.showToast(result.message);
-    } catch (exception) {
-      window.ui.showToast(exception.message, true);
-    }
-  });
 })();
