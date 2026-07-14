@@ -133,21 +133,6 @@ http://192.168.1.10:9091/control/df%20-h?host=192.168.1.100&user=root&pwd=passwo
 
 单条指令最大 4096 个字符，单次 stdout 与 stderr 合计最多保存 1 MiB，超出后会在结果中标记截断。
 
-## 开发与测试
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements-dev.txt
-DATA_DIR=/tmp/url-to-ssh-dev ADMIN_PASSWORD=development-password python app.py
-```
-
-运行测试：
-
-```bash
-pytest
-```
-
 ## 安全提示
 
 - 本项目默认面向可信内网。需要公网访问时，请使用 HTTPS、网络访问控制和反向代理。

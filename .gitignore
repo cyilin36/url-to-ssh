@@ -29,6 +29,8 @@ data/
 config.json
 secrets.yaml
 github Personal Access Token.txt
+test/
+tests/
 
 # Docker/local overrides
 docker-compose.override.yml
