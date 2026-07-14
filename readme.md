@@ -2,24 +2,28 @@
 
 一个轻量的 HTTP 到 SSH 网关，并带有主机、预设指令和 Wake-on-LAN 管理界面。适合在可信局域网内配合浏览器、iOS 快捷指令、Home Assistant 或 Webhook 使用。
 
+当前 Compose 使用镜像：`ghcr.io/cyilin36/url-to-ssh:v1.1-beta1`。
+
 ## 功能
 
-- 在 `/ui/` 管理主机的 IP、MAC、SSH 账号和连接端口
+- 在 `/ui/` 初始化单管理员密码并登录管理后台
+- 管理主机的 IP/主机名、MAC、SSH 账号和连接端口
 - 加密保存 SSH 密码，使用 SQLite 持久化数据
-- 在主机页面执行临时指令并查看 stdout、stderr 和退出码
-- 保存全局指令或指定主机的专属指令
+- 在主机页面执行临时指令并查看 stdout、stderr、退出码和错误信息
+- 保存全局指令或指定主机的专属指令，点击后可以直接执行
 - 为固定的“主机 + 指令”生成不含 SSH 密码的永久签名 URL
+- 每台主机使用独立链接密钥，并支持轮换密钥使旧链接失效
 - 发送 Wake-on-LAN 魔术包并生成签名唤醒 URL
 - 完整保留原有 `/control/<command>` 接口
 
 ## Docker Compose 部署
 
-建议使用 Host 网络模式，以便容器直接访问局域网主机并发送广播包。
+仓库中的 `docker-compose.yml` 默认面向 Linux 主机，使用 Host 网络模式，以便容器直接访问局域网主机并发送广播包。
 
 ```yaml
 services:
   url-to-ssh:
-    image: ghcr.io/cyilin36/url-to-ssh:latest
+    image: ghcr.io/cyilin36/url-to-ssh:v1.1-beta1
     container_name: url-to-ssh
     restart: always
     network_mode: host
@@ -31,10 +35,14 @@ services:
       # 可选：固定主密钥；设置后不可随意更改
       # - APP_SECRET=replace-with-a-long-random-secret
     volumes:
-      - url-to-ssh-data:/data
+      - ./data:/data
+```
 
-volumes:
-  url-to-ssh-data:
+启动：
+
+```bash
+docker compose pull
+docker compose up -d
 ```
 
 启动后访问：
@@ -43,6 +51,39 @@ volumes:
 - 原有接口帮助：`http://<服务器IP>:9091/`
 
 如果没有配置 `ADMIN_PASSWORD`，第一次打开 WebUI 时会要求创建管理员密码。如果没有配置 `APP_SECRET`，应用会在 `/data/app.secret` 自动生成主密钥。数据库和该文件必须一起备份；丢失或更改密钥后，已保存的密码将无法解密。
+
+持久化数据保存在项目目录的 `./data/` 中，主要包含：
+
+```text
+data/
+├── app.secret
+└── url-to-ssh.db
+```
+
+### Linux 网络配置
+
+Linux 用户直接使用仓库中的 `docker-compose.yml` 即可。`network_mode: host` 会让服务直接监听 Linux 主机的 `9091` 端口，不需要再添加 `ports:`。
+
+### macOS 与 `docker-compose.override.yml`
+
+macOS 用户需要在项目根目录创建 `docker-compose.override.yml`：
+
+```yaml
+services:
+  url-to-ssh:
+    network_mode: bridge
+    ports:
+      - "9091:9091"
+```
+
+然后仍然使用普通命令启动：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+然后访问 `http://localhost:9091/ui/`。macOS 下 Wake-on-LAN 广播可能受 Docker 虚拟机网络限制，需要稳定使用 WOL 时建议部署到 Linux 主机。
 
 也可以在项目目录本地构建：
 

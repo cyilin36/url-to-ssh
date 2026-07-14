@@ -1,30 +1,42 @@
-# --- Python 编译文件 (垃圾文件) ---
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
 
-# --- 虚拟环境 (体积大，不需要上传) ---
-venv/
+# Virtual environments
 .venv/
+venv/
 env/
 my_env/
 
-# --- IDE 配置文件 (你个人的编辑器配置) ---
+# Test and coverage output
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local app data and secrets
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.secret
+.env
+.env.*
+!.env.example
+config.json
+secrets.yaml
+github Personal Access Token.txt
+
+# Docker/local overrides
+docker-compose.override.yml
+
+# Editor and OS files
 .idea/
 .vscode/
 *.swp
-
-# --- 操作系统生成的垃圾文件 ---
+*.swo
 .DS_Store
 Thumbs.db
-
-# --- 敏感信息 (非常重要) ---
-.env
-.env.local
-config.json
-secrets.yaml
-
-# --- Docker (如果本地构建产生临时文件) ---
-docker-compose.override.yml
-
-github Personal Access Token.txt
